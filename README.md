@@ -2,12 +2,11 @@
 
 Creates a secure WebSocket connection using ssl-pinning technique.
 
-⚠ **THIS PROJECT IS STILL IN DEVELOPMENT STAGE** ⚠
-
 ## Installation
 
+Add the following line in the `"dependencies"` field inside `package.json` of the project:
 ```sh
-yarn add react-native-websocket-ssl-pinning
+"react-native-websocket-ssl-pinning": "git+ssh://git@github.com:CareHawk/react-native-websocket-ssl-pinning.git#master",
 ```
 
 ## Usage

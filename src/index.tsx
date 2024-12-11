@@ -96,6 +96,19 @@ const closeWebSocket = () => {
   );
 };
 
+const terminateWebSocket = () => {
+  WebSocketSslPinning.terminateWebSocket(
+    'Client initiated closure',
+    (error: string, successMessage: string) => {
+      if (error) {
+        console.error('Error terminating WebSocket:', error);
+      } else {
+        console.log(successMessage);
+      }
+    }
+  );
+};
+
 const sendWebSocketMessage = async (message: any) => {
   try {
     const res = await new Promise<any>((resolve, reject) => {
@@ -147,4 +160,5 @@ export {
   sendWebSocketMessage,
   eventEmitter,
   closeWebSocket,
+  terminateWebSocket,
 };
