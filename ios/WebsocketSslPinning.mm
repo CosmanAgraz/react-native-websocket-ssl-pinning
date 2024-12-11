@@ -1,14 +1,19 @@
-#import <React/RCTBridgeModule.h>
+#import "WebsocketSslPinning.h"
 
-@interface RCT_EXTERN_MODULE(WebSocketSslPinning, NSObject)
+@implementation WebsocketSslPinning
+RCT_EXPORT_MODULE()
 
-RCT_EXTERN_METHOD(multiply:(float)a withB:(float)b
-                 withResolver:(RCTPromiseResolveBlock)resolve
-                 withRejecter:(RCTPromiseRejectBlock)reject)
-
-+ (BOOL)requiresMainQueueSetup
+// Example method
+// See // https://reactnative.dev/docs/native-modules-ios
+RCT_EXPORT_METHOD(multiply:(double)a
+                  b:(double)b
+                  resolve:(RCTPromiseResolveBlock)resolve
+                  reject:(RCTPromiseRejectBlock)reject)
 {
-  return NO;
+    NSNumber *result = @(a * b);
+
+    resolve(result);
 }
+
 
 @end

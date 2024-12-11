@@ -6,8 +6,8 @@ import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Callback;
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
@@ -18,30 +18,22 @@ import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeMap;
 import com.facebook.react.modules.network.ForwardingCookieHandler;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
-import com.websocketsslpinning.utils.OkHttpUtils;
-
-import org.json.JSONException;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
-import okhttp3.Call;
 import okhttp3.Cookie;
 import okhttp3.CookieJar;
 import okhttp3.Headers;
 import okhttp3.HttpUrl;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.WebSocket;
-import okhttp3.WebSocketListener;
 import okhttp3.Response;
 
 import com.google.gson.Gson;
@@ -88,7 +80,6 @@ public class WebSocketSslPinningModule extends ReactContextBaseJavaModule {
     private final HashMap<String, List<Cookie>> cookieStore;
     private CookieJar cookieJar = null;
     private ForwardingCookieHandler cookieHandler;
-    private OkHttpClient client;
 
     public WebSocketSslPinningModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -202,8 +193,6 @@ public class WebSocketSslPinningModule extends ReactContextBaseJavaModule {
         promise.resolve(null);
     }
 
-    private WebSocket webSocketInstance;
-
     /**
      * Send this to Javascript
      * @param eventName
@@ -225,109 +214,102 @@ public class WebSocketSslPinningModule extends ReactContextBaseJavaModule {
         return gson.toJson(Arguments.toBundle(readableMap));
     }
 
-    @ReactMethod
+  /**
+   * Send this over the network
+   * @param message JSON message
+   * @param callback response send to Javascript
+   */
+  @ReactMethod
     public void sendWebSocketMessage(String message, final Callback callback) {
-        if (webSocketInstance != null) {
-            try {
-                // Send the WebSocket message
-                webSocketInstance.send(message);
+        try {
+            boolean sent = Socket.getInstance().send("test", message);
+            if (sent) {
                 callback.invoke(null, "Message sent successfully");
-            } catch (Exception e) {
-                callback.invoke("SEND_ERROR", "Failed to send message: " + e.getMessage());
+            } else {
+                callback.invoke("SEND_ERROR", "Failed to send message");
             }
-        } else {
-            callback.invoke(new Throwable("WebSocket not initialized"));
+        } catch (Exception e) {
+            callback.invoke("SEND_ERROR", "Failed to send message: " + e.getMessage());
         }
     }
 
     @ReactMethod
     public void fetch(String hostname, final ReadableMap options, final Callback callback) {
-        if (webSocketInstance != null) {
-            callback.invoke(new Throwable("WebSocket is already open"));
-            return;
-        }
-
         final WritableMap response = Arguments.createMap();
-        String domainName;
-        try {
-            domainName = getDomainName(hostname);
-        } catch (URISyntaxException e) {
-            domainName = hostname;
-        }
 
-        // Check if WSS (WebSocket Secure) is being used
         if (hostname.startsWith("wss://")) {
-            // Use the same SSL pinning mechanism for WSS
             if (options.hasKey(OPT_SSL_PINNING_KEY)) {
                 if (options.getMap(OPT_SSL_PINNING_KEY).hasKey("certs")) {
                     ReadableArray certs = options.getMap(OPT_SSL_PINNING_KEY).getArray("certs");
                     if (certs != null && certs.size() == 0) {
                         throw new RuntimeException("certs array is empty");
                     }
-                    // Build OkHttpClient with WSS and SSL pinning
-                    client = OkHttpUtils.buildOkHttpClient(cookieJar, domainName, certs, options);
+
+                    Socket mSocket = SocketBuilder.with(hostname).setCertificate(certs).setPingInterval(10, TimeUnit.SECONDS)
+                      .setConnectTimeout(10, TimeUnit.SECONDS)
+                      .setReadTimeout(10, TimeUnit.SECONDS)
+                      .setWriteTimeout(10, TimeUnit.SECONDS).build();
+
+
+                    mSocket.addOnChangeStateListener(new OnStateChangeListener() {
+                      // Socket connection events
+                      @Override
+                      public void onChange(SocketState status) {
+                        switch (status) {
+                          case OPEN:
+                            Log.d("WebSocketSsLPinning", "Socket is ONLINE: " + status);
+                            break;
+                          case CLOSING: case CLOSED: case RECONNECTING:
+                          case RECONNECT_ATTEMPT: case CONNECT_ERROR:
+                            Log.d("WebSocketSsLPinning", "Socket state changed to: " + status);
+                            break;
+                        }
+                      }
+
+                      @Override
+                      public void onFailure(Throwable t) {
+                        sendEvent("onFailure", t.getMessage());
+                      }
+
+                      @Override
+                      public void onOpen(Response response) {
+                          sendEvent("onOpen", response.message());
+                      }
+
+                      @Override
+                      public void onClosed(int code, String reason) {
+                        Log.d("WebSocketSsLPinning", "Socket was closed.");
+                      }
+                    }).addOnEventResponseListener("wsapi", new OnEventResponseListener() {
+                        @Override
+                        public void onMessage(String event, String data) {
+                            sendEvent("onMessage", data);
+                        }
+                    });
+
+                    mSocket.connect();
                 } else {
-                    callback.invoke(new Throwable("key certs was not found"), null);
+                    Log.e("WebSocketSsLPinning", "key certs was not found.");
+                    return;
                 }
             } else {
-                callback.invoke(new Throwable(KEY_NOT_ADDED_ERROR), null);
+                Log.e("WebSocketSsLPinning", KEY_NOT_ADDED_ERROR);
                 return;
             }
-
-            // Initialize WebSocket request
-            Request request = new Request.Builder().url(hostname).build();
-            OkHttpClient wsClient = client.newBuilder().build();
-            
-            // Open the WebSocket connection
-            wsClient.newWebSocket(request, new WebSocketListener() {
-                @Override
-                public void onOpen(WebSocket webSocket, Response response) {
-                    webSocketInstance = webSocket;
-
-                    WritableMap responseMap = Arguments.createMap();
-                    responseMap.putString("status", "WebSocket Opened");
-                    responseMap.putInt("code", response.code());
-                    responseMap.putString("message", response.message());
-                
-                    callback.invoke(null, responseMap);
-                }
-
-                @Override
-                public void onMessage(WebSocket webSocket, String text) {
-                    sendEvent("onMessage", text);
-                }
-
-                @Override
-                public void onFailure(WebSocket webSocket, Throwable t, Response response) {
-                    webSocket.close(1000, null);
-                    webSocketInstance = null;
-                }
-
-                @Override
-                public void onClosing(WebSocket webSocket, int code, String reason) {
-                    webSocket.close(1000, null);
-                }
-
-                @Override
-                public void onClosed(WebSocket webSocket, int code, String reason) {
-                    sendEvent("onClosed", reason);
-                    webSocketInstance = null;
-                }
-            });
-            
         }
+        return;
     }
 
     @ReactMethod
     public void closeWebSocket(String reason, Callback callback) {
-        if (webSocketInstance != null) {
-            webSocketInstance.close(1000, reason);
-            webSocketInstance = null;
-            callback.invoke(null, "WebSocket successfully closed");
-        } else {
-            callback.invoke("WebSocket cannot close because it has not yet been initialized", null);
-            return;
-        }
+        Socket.getInstance().close();
+        callback.invoke(null, "WebSocket successfully closed");
+    }
+
+    @ReactMethod
+    public void terminateWebSocket(String reason, Callback callback) {
+        Socket.getInstance().terminate();
+        callback.invoke(null, "WebSocket successfully terminated");
     }
 
 
@@ -345,6 +327,17 @@ public class WebSocketSslPinningModule extends ReactContextBaseJavaModule {
     @Override
     public String getName() {
         return "WebSocketSslPinning";
+    }
+
+    // Required for rn built in EventEmitter Calls.
+    @ReactMethod
+    public void addListener(String eventName) {
+        // Suppresses warnings
+    }
+
+    @ReactMethod
+    public void removeListeners(Integer count) {
+        // Suppresses warnings
     }
 
 }
