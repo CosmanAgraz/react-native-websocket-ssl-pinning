@@ -4,40 +4,62 @@ Creates a secure WebSocket connection using ssl-pinning technique.
 
 ## Installation
 
-Add the following line in the `"dependencies"` field inside `package.json` of the project:
-```sh
-"react-native-websocket-ssl-pinning": "git+ssh://git@github.com:CareHawk/react-native-websocket-ssl-pinning.git#master",
+```
+yarn add react-native-websocket-ssl-pinning
 ```
 
-## Usage
+## API
 
-Create the connection
-```js
-import { fetch } from 'react-native-websocket-ssl-pinning';
+### Methods
 
-try{
-  const response = await fetch(`wss://${serverip}/`, {
-	method: 'GET',
-	timeoutInterval: 10000, // Request timeout
-	sslPinning: {
-	  certs: ['rootCA_public'],
-	},
-  });
-  
-  if (response.code === 101) {
-	console.log(
-	  'Switching protocols. Starting secure web socket connection...',
-	);
+#### fetch(string: url, any: obj)
+Attempts to open the WSS connection to specified endpoint. Certs must be `.cer` format
 
-	socketOpen()
-  }
-} catch(e) {
-  console.error(e);
-}
+Example:
+```
+      fetch(`wss://${domain}/`, {
+        method: 'GET',
+        sslPinning: {
+          certs: ['rootCA_public'],
+        },
+      });
 ```
 
-*TODO: finish usage*
+#### sendWebSocketMessage(string: message)
+Sends a messaage. Must be called after *fetch*.
 
+
+#### terminateWebSocket(void)
+Aggressively stops the web socket connection and instance
+
+
+#### closeWebSocket(string: reason)
+Closes the web socket.
+
+### Members
+
+#### NativeEventEmitter eventEmitter
+Requires the following listeners:
+'onOpen'
+'onClosed'
+'onFailure'
+'onMessage'
+
+Each listener requires a callback function.
+
+Example:
+```
+openListener = eventEmitter.addListener('onOpen', socketOpen);
+closeListener = eventEmitter.addListener('onClosed', socketClosed);
+messageListener = eventEmitter.addListener('onMessage', socketMsg);
+failureListener = eventEmitter.addListener('onFailure', socketFailed);
+
+// when web socket is terminated, clean up the listeners
+openListener.remove();
+closeListener.remove();
+messageListener.remove();
+failureListener.remove();
+```
 
 ## Contributing
 
