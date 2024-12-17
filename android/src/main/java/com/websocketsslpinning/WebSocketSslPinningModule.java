@@ -237,7 +237,7 @@ public class WebSocketSslPinningModule extends ReactContextBaseJavaModule {
     public void fetch(String hostname, final ReadableMap options, final Callback callback) {
         final WritableMap response = Arguments.createMap();
 
-        if (hostname.startsWith("wss://")) {
+        if (hostname.startsWith("wss://") || hostname.startsWith("ws://")) {
             if (options.hasKey(OPT_SSL_PINNING_KEY)) {
                 if (options.getMap(OPT_SSL_PINNING_KEY).hasKey("certs")) {
                     ReadableArray certs = options.getMap(OPT_SSL_PINNING_KEY).getArray("certs");
