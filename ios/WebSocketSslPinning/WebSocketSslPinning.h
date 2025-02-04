@@ -16,8 +16,6 @@
 #import <React/RCTBridgeModule.h>
 #import <React/RCTEventEmitter.h>
 
-#import "WebSocketStates.h"
-
 @interface RCTWebSocketSslPinning : RCTEventEmitter <RCTBridgeModule, NSURLSessionWebSocketDelegate>
 
 @property bool connectionDrop;
