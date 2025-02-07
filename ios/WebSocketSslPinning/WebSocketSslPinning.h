@@ -15,8 +15,9 @@
 //  RCTCalendarModule.h
 #import <React/RCTBridgeModule.h>
 #import <React/RCTEventEmitter.h>
+#import <SocketRocket/SRWebSocket.h>
 
-@interface RCTWebSocketSslPinning : RCTEventEmitter <RCTBridgeModule, NSURLSessionWebSocketDelegate>
+@interface RCTWebSocketSslPinning : RCTEventEmitter <RCTBridgeModule, NSURLSessionWebSocketDelegate, SRWebSocketDelegate>
 
 @property bool connectionDrop;
 @property bool hasListeners;
@@ -48,6 +49,9 @@ didReceiveChallenge:(NSURLAuthenticationChallenge *)challenge
 
 // React Native
 -(void)sendEventToJavaScript:(NSString *)eventName withParams:(id)params;
+
+// Socket Rocket
+@property (nonatomic, strong) SRWebSocket *socketRocket;
 @end
 
 #endif /* RCTWebSocketSsLPinning_h */
