@@ -1,6 +1,6 @@
 //
 //  RCTWebSocketSsLPinning.m
-// react-native-websocket-ssl-pinning
+//  react-native-websocket-ssl-pinning
 //
 //  Created by Sergio Cosman Agraz on 2024-12-31.
 //
